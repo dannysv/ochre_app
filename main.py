@@ -5,6 +5,7 @@ import tqdm
 from collections import Counter
 import os
 import nltk
+import time
 
 
 from keras.models import load_model
@@ -82,9 +83,9 @@ def lstm_synced_correct_ocr(model, charset, text):
     #print(corrected_text)
     return corrected_text 
 
-def corrigir(model, charset, word):
+def corrigir(model, charset, word, iterar):
     resp = {word:0}
-    for i in range(10):
+    for i in range(iterar):
         word_corr = lstm_synced_correct_ocr(model, charset,word)
         try:
             resp[word_corr]+=1
@@ -92,35 +93,35 @@ def corrigir(model, charset, word):
             resp.update({word_corr:1})
     return resp 
 
-def corrigir_sent(model, charset, sent):
-    resp = corrigir(model, charset, sent)
+def corrigir_sent(model, charset, sent, iterar):
+    resp = corrigir(model, charset, sent, iterar)
     #key, _ = max(resp.iteritems(), key=lambda x:x[1])
     key = max(resp, key=lambda key: resp[key])
     return key 
 
-def corrigir_line(model, charset, line):
+def corrigir_line(model, charset, line, iterar):
     sents = nltk.sent_tokenize(line)
     sents_new = []
     for sent in sents:
-        sent_new = corrigir_sent(model, charset, sent)
+        sent_new = corrigir_sent(model, charset, sent, iterar)
         sents_new.append(sent_new)
     return ' '.join(sents_new)
 
 def read_file(path):
     try:
-        with open(path, 'r') as f:
+        with codecs.open(path, 'r', encoding="ISO-8859-1") as f:
             resp = f.readlines()
         return resp 
     except Exception as e:
-        print('errorrrr')
+        print(e)
         return None
 
-def processar_onefile(pathin, pathout, txtfile, model, charset):
+def processar_onefile(pathin, pathout, txtfile, model, charset, iterar):
     lines = read_file(os.path.join(pathin, txtfile))
     out = codecs.open(os.path.join(pathout, txtfile), 'w')
     for line in tqdm.tqdm(lines):
         line = line.strip()
-        line_new = corrigir_line(model, charset, line)
+        line_new = corrigir_line(model, charset, line, iterar)
         out.write(line_new+'\n')
     out.close()
 
@@ -130,6 +131,12 @@ if __name__ == "__main__":
                         type=str,
                         required=False,
                         help='caminho para a pasta de entrada')
+    parser.add_argument('--it', 
+                        type=int,
+                        required=False,
+                        default=10,
+                        help='número de vezes que corrige um mesmo texto (default 10)')
+    
     parser.add_argument('--folderout', 
                         required=False,
                         default='ochre',
@@ -138,7 +145,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     folderin=args.folderin 
-    folderout=args.folderout
+    it = args.it
+    folderout=args.folderout 
     
     if folderin is not None:
         if os.path.exists(folderin):
@@ -168,10 +176,11 @@ if __name__ == "__main__":
             for fil in files:
                 try:
                     if fil not in files_ok:
-                        processar_onefile(folderin, folderout, fil, model, charset)
+                        processar_onefile(folderin, folderout, fil, model, charset, it)
                     else:
                         print("arquivo %s já processado"%fil)
                 except Exception as e:
+                    print('error in %s'%fil)
                     print(e)
         else:
             print("folder de entrada no existe")
@@ -186,13 +195,13 @@ if __name__ == "__main__":
         word4 = 'dlariamante'
         word5 = 'ótime dla'
         word6 = '□       controle'
-
-        resp1 = corrigir(model, charset, word1)
-        resp2 = corrigir(model, charset, word2)
-        resp3 = corrigir(model, charset, word3)
-        resp4 = corrigir(model, charset, word4)
-        resp5 = corrigir(model, charset, word5)
-        resp6 = corrigir(model, charset, word6)
+        t0 = time.time()
+        resp1 = corrigir(model, charset, word1, it)
+        resp2 = corrigir(model, charset, word2, it)
+        resp3 = corrigir(model, charset, word3, it)
+        resp4 = corrigir(model, charset, word4, it)
+        resp5 = corrigir(model, charset, word5, it)
+        resp6 = corrigir(model, charset, word6, it)
 
         print('OCR: %s'%word1)
         print('SUGESTÕES: %s'%resp1)
@@ -205,3 +214,5 @@ if __name__ == "__main__":
         print('OCR: %s'%word5)
         print('SUGESTÕES: %s'%resp5)
         print('SUGESTÕES: %s'%resp6)
+        t1 = time.time()
+        print("corrigir os exemplos com it=%i, foi de %f"%(it, t1-t0))
