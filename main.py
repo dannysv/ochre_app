@@ -126,22 +126,21 @@ def processar_onefile(pathin, pathout, txtfile, model, charset):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('scrip para correção com ochre')
-    parser.add_argument('case', 
+    parser.add_argument('--folderin', 
                         type=str,
-                        help='pasta, file, exemplo: selecionar a opção que quer processar (uma pasta, um arquivo, ou ver um exemplo)')
-    parser.add_argument('folderin', 
+                        required=False,
+                        help='caminho para a pasta de entrada')
+    parser.add_argument('--folderout', 
+                        required=False,
+                        default='ochre',
                         type=str,
-                        help='caminho para a pasta/arquivo a ser processado')
-    parser.add_argument('folderout', 
-                        type=str,
-                        help='pasta onde deveria ser salvo o resultado')
+                        help='caminho para a pasta de saida')
 
     args = parser.parse_args()
-    case=args.case
-    folderin=args.folderin
-    folderout=args.folderout 
+    folderin=args.folderin 
+    folderout=args.folderout
     
-    if case == "pasta" or case == "file":
+    if folderin is not None:
         if os.path.exists(folderin):
             print("carregar modelo")
             model_path = './models/0.1241-88.hdf5'
@@ -151,19 +150,32 @@ if __name__ == "__main__":
             #listar os arquivos de txt
             files = os.listdir(folderin)
             files = [f for f in files if str(f).endswith('.txt') and 'readme' not in str(f)]
+
+            #pasta saida
+            if folderout == 'ochre':
+                if folderin[-1]=='/':
+                    folderout=folderin[:-1].split('/')[-1]+'_ochre'
+                else:
+                    folderout= folderin.split('/')[-1]+'_ochre'
+            print('pasta de saida: %s'%folderout)
+ 
+
             if os.path.exists(folderout)==False:
                 os.mkdir(folderout)
-            if case=="pasta":
-                print("processar todos los archivos de una carpeta in folder: %s" %files)
-                for fil in files:
-                    processar_onefile(folderin, folderout, fil, model, charset)
-            elif case=='file':
-                print('teste de un sólo archivo: %s'%files[0])
-                print("cmeçar correção")
-                processar_onefile(folderin, folderout, files[0], model, charset)
+            #obter arquivos já processados
+            files_ok = os.listdir(folderout)
+            #print("processar todos los archivos de una carpeta in folder: %s" %files)
+            for fil in files:
+                try:
+                    if fil not in files_ok:
+                        processar_onefile(folderin, folderout, fil, model, charset)
+                    else:
+                        print("arquivo %s já processado"%fil)
+                except Exception as e:
+                    print(e)
         else:
             print("folder de entrada no existe")
-    if case=='exemplo':
+    else:
         model_path = './models/0.1241-88.hdf5'
         model = load_model(model_path)
         charset = './models/chars-lower.txt'
