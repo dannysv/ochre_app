@@ -97,7 +97,10 @@ def corrigir_sent(model, charset, sent, iterar):
     resp = corrigir(model, charset, sent, iterar)
     #key, _ = max(resp.iteritems(), key=lambda x:x[1])
     key = max(resp, key=lambda key: resp[key])
-    return key 
+    if key.strip() == '':
+        return sent
+    else:
+        return key 
 
 def corrigir_line(model, charset, line, iterar):
     sents = nltk.sent_tokenize(line)
@@ -109,16 +112,28 @@ def corrigir_line(model, charset, line, iterar):
 
 def read_file(path):
     try:
-        with codecs.open(path, 'r', encoding="ISO-8859-1") as f:
+        with codecs.open(path, 'r', encoding="utf-8") as f:
             resp = f.readlines()
+        print('read %s with utf-8'%path)
         return resp 
     except Exception as e:
-        print(e)
-        return None
+        if "'utf-8' codec can't" in str(e):
+        #try to read with iso-8859-1
+            try: 
+                with codecs.open(path, 'r', encoding="iso-8859-1") as f:
+                    resp = f.readlines()
+                print('read %s with iso-8859-1'%path)
+                return resp 
+            except Exception as e:
+                print(e)
+                return None
+        else:
+            print(e)
+            return None
 
 def processar_onefile(pathin, pathout, txtfile, model, charset, iterar):
     lines = read_file(os.path.join(pathin, txtfile))
-    out = codecs.open(os.path.join(pathout, txtfile), 'w')
+    out = codecs.open(os.path.join(pathout, txtfile), 'w', 'utf-8')
     for line in tqdm.tqdm(lines):
         line = line.strip()
         line_new = corrigir_line(model, charset, line, iterar)
@@ -193,8 +208,9 @@ if __name__ == "__main__":
         word2 = 'locaimente'
         word3 = 'petrolee'
         word4 = 'dlariamante'
-        word5 = 'ótime dla'
-        word6 = '□       controle'
+        word5 = 'Pós-graduação'
+        word6 = 'Geociências'
+        word7 = 'fluxoé'
         t0 = time.time()
         resp1 = corrigir(model, charset, word1, it)
         resp2 = corrigir(model, charset, word2, it)
@@ -202,6 +218,7 @@ if __name__ == "__main__":
         resp4 = corrigir(model, charset, word4, it)
         resp5 = corrigir(model, charset, word5, it)
         resp6 = corrigir(model, charset, word6, it)
+        resp7 = corrigir(model, charset, word7, it)
 
         print('OCR: %s'%word1)
         print('SUGESTÕES: %s'%resp1)
@@ -214,5 +231,6 @@ if __name__ == "__main__":
         print('OCR: %s'%word5)
         print('SUGESTÕES: %s'%resp5)
         print('SUGESTÕES: %s'%resp6)
+        print('SUGESTÕES: %s'%resp7)
         t1 = time.time()
         print("corrigir os exemplos com it=%i, foi de %f"%(it, t1-t0))
