@@ -1,12 +1,13 @@
 import codecs
 import os
+import pickle
 import numpy as np 
 import tqdm
 from collections import Counter
 import os
 import nltk
 import time
-
+from mpt.mpt import MerklePatriciaTrie 
 
 from keras.models import load_model
 
@@ -14,6 +15,30 @@ from utils import get_char_to_int, get_int_to_char, read_text_to_predict
 from edlibutils import align_output_to_input
 import argparse
 
+#funcion que verifica si existe o no una sequencia en un trie dado
+def exists_trie(trie_vocab, word):
+    bword = bytes(word, 'utf-8')
+    try:
+        val = trie_vocab.get(bword)
+        #print('the word %s exists in the trie'%str(word))
+        return True
+    except KeyError:
+        #print('%s, Not accessible in the trie'%str(word))
+        return False 
+
+#funcion que selecciona la mejor opcion de varias correcciones
+# opciones = {'opcion1':freq1, 'opcion2':freq2, ...}
+def select_option(trie_vocab, opciones):
+    existen = {}
+    for word in opciones:
+        if exists_trie(trie_vocab, word):
+            item = {word:opciones[word]}
+            existen.update(item)
+    if len(existen)==0:
+        return None 
+    else:
+        existen_ordenado = sorted(existen, key = existen.get, reverse=True)
+        return existen_ordenado[0]
 
 def lstm_synced_correct_ocr(model, charset, text):
     # load model
@@ -84,7 +109,8 @@ def lstm_synced_correct_ocr(model, charset, text):
     return corrected_text 
 
 def corrigir(model, charset, word, iterar):
-    resp = {word:0}
+    #resp = {word:0}
+    resp = {}
     for i in range(iterar):
         word_corr = lstm_synced_correct_ocr(model, charset,word)
         try:
@@ -200,6 +226,9 @@ if __name__ == "__main__":
         else:
             print("folder de entrada no existe")
     else:
+        ## app
+        with open('../classificador/data/tries/vocab_union.trie', 'rb') as f:
+                trie_vocab = pickle.load(f)
         model_path = './models/0.1241-88.hdf5'
         model = load_model(model_path)
         charset = './models/chars-lower.txt'
@@ -217,20 +246,27 @@ if __name__ == "__main__":
         resp3 = corrigir(model, charset, word3, it)
         resp4 = corrigir(model, charset, word4, it)
         resp5 = corrigir(model, charset, word5, it)
-        resp6 = corrigir(model, charset, word6, it)
-        resp7 = corrigir(model, charset, word7, it)
+        #resp6 = corrigir(model, charset, word6, it)
+        #resp7 = corrigir(model, charset, word7, it)
 
         print('OCR: %s'%word1)
         print('SUGESTÕES: %s'%resp1)
+        selected = select_option(trie_vocab, resp1)
+        print('selected: %s'%selected)
         print('OCR: %s'%word2)
         print('SUGESTÕES: %s'%resp2)
+        selected = select_option(trie_vocab, resp2)
+        print('selected: %s'%selected)
         print('OCR: %s'%word3)
         print('SUGESTÕES: %s'%resp3)
+        selected = select_option(trie_vocab, resp3)
+        print('selected: %s'%selected)
         print('OCR: %s'%word4)
         print('SUGESTÕES: %s'%resp4)
+        selected = select_option(trie_vocab, resp4)
+        print('selected: %s'%selected)
         print('OCR: %s'%word5)
         print('SUGESTÕES: %s'%resp5)
-        print('SUGESTÕES: %s'%resp6)
-        print('SUGESTÕES: %s'%resp7)
+        selected = select_option(trie_vocab, resp5)
         t1 = time.time()
         print("corrigir os exemplos com it=%i, foi de %f"%(it, t1-t0))
